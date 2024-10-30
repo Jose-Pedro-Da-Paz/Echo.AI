@@ -14,8 +14,10 @@
 
     <script>
         const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        let recordingInProgress = false;
 
-        document.getElementById("start-recording").onclick = async () => {
+        async function startRecording() {
+            // Inicia a gravação enviando o POST para /start-recording apenas uma vez
             await fetch('/transcription/start-recording/', { 
                 method: 'POST', 
                 headers: {
@@ -23,11 +25,15 @@
                     'X-CSRFToken': csrftoken
                 }
             });
-            document.getElementById("start-recording").disabled = true;
+            recordingInProgress = true;
             document.getElementById("stop-recording").disabled = false;
-        };
+            console.log("Gravação iniciada.");
+        }
 
-        document.getElementById("stop-recording").onclick = async () => {
+        async function stopRecording() {
+            if (!recordingInProgress) return;
+
+            // Para a gravação enviando o POST para /stop-recording
             await fetch('/transcription/stop-recording/', { 
                 method: 'POST', 
                 headers: {
@@ -35,8 +41,23 @@
                     'X-CSRFToken': csrftoken
                 }
             });
-            document.getElementById("stop-recording").disabled = true;
+            recordingInProgress = false;
             document.getElementById("transcribe").disabled = false;
+            console.log("Gravação parada.");
+        }
+
+        // Ativa/desativa os botões conforme o estado de gravação
+        document.getElementById("start-recording").onclick = async () => {
+            if (!recordingInProgress) {
+                await startRecording();
+                document.getElementById("start-recording").disabled = true;
+            }
+        };
+
+        document.getElementById("stop-recording").onclick = async () => {
+            await stopRecording();
+            document.getElementById("stop-recording").disabled = true;
+            document.getElementById("start-recording").disabled = false;
         };
 
         document.getElementById("transcribe").onclick = async () => {
@@ -53,3 +74,4 @@
     </script>
 </body>
 </html>
+
