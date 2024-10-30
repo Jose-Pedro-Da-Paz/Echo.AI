@@ -12,12 +12,17 @@
     <button id="stop-recording" disabled>Parar Gravação</button>
     <button id="transcribe" disabled>Transcrever</button>
 
+    <!-- Campo fixo para exibir a transcrição e o status de upload -->
+    <div id="transcription-result" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px; width: 100%; height: 100px; overflow-y: auto;">
+        <p id="transcription-text">A transcrição aparecerá aqui...</p>
+    </div>
+    <p id="upload-status" style="color: red; font-weight: bold;"></p>
+
     <script>
         const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         let recordingInProgress = false;
 
         async function startRecording() {
-            // Inicia a gravação enviando o POST para /start-recording apenas uma vez
             await fetch('/transcription/start-recording/', { 
                 method: 'POST', 
                 headers: {
@@ -33,7 +38,6 @@
         async function stopRecording() {
             if (!recordingInProgress) return;
 
-            // Para a gravação enviando o POST para /stop-recording
             await fetch('/transcription/stop-recording/', { 
                 method: 'POST', 
                 headers: {
@@ -46,7 +50,6 @@
             console.log("Gravação parada.");
         }
 
-        // Ativa/desativa os botões conforme o estado de gravação
         document.getElementById("start-recording").onclick = async () => {
             if (!recordingInProgress) {
                 await startRecording();
@@ -61,15 +64,44 @@
         };
 
         document.getElementById("transcribe").onclick = async () => {
-            const response = await fetch('/transcription/transcribe/', { 
-                method: 'POST', 
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
+            // Atualiza o status para indicar que o upload está em andamento
+            document.getElementById("upload-status").innerText = "Enviando arquivo para transcrição, aguarde...";
+
+            let uploadSuccess = false;
+            let attempts = 0;
+            const maxAttempts = 5;
+
+            while (!uploadSuccess && attempts < maxAttempts) {
+                try {
+                    const response = await fetch('/transcription/transcribe/', { 
+                        method: 'POST', 
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        document.getElementById("transcription-text").innerText = data.transcription || data.error;
+                        uploadSuccess = true;
+                        document.getElementById("upload-status").innerText = ""; // Limpa a mensagem de status
+                    } else {
+                        throw new Error("Falha no upload");
+                    }
+                } catch (error) {
+                    attempts++;
+                    document.getElementById("upload-status").innerText = `Tentando novamente... (${attempts}/${maxAttempts})`;
+                    console.log("Erro ao transcrever:", error);
+
+                    // Espera alguns segundos antes de tentar novamente
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                 }
-            });
-            const data = await response.json();
-            alert(data.transcription || data.error);
+            }
+
+            if (!uploadSuccess) {
+                document.getElementById("upload-status").innerText = "Falha no upload após várias tentativas. Verifique a conexão.";
+            }
         };
     </script>
 </body>
