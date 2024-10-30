@@ -6,6 +6,7 @@ from django.views import View
 from pydub import AudioSegment
 from groq import Groq
 from django.shortcuts import render
+import threading
 
 # Inicializa o cliente da API GROQ
 client = Groq(api_key='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')
@@ -18,28 +19,54 @@ os.makedirs(AUDIO_DIR, exist_ok=True)
 # Parâmetros de gravação
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 16000
+RATE = 44000
 CHUNK = 1024
 OUTPUT_WAV = os.path.join(AUDIO_DIR, "audio.wav")  # Salvar em WAV
 
+# Variável de controle para a gravação
+is_recording = False
+frames = []
+audio = None
+stream = None
+
 class RecordView(View):
     def post(self, request):
-        # Inicializa PyAudio
+        global is_recording, frames, audio, stream
+
+        # Inicializa PyAudio e os parâmetros de gravação
         audio = pyaudio.PyAudio()
-        stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+        stream = audio.open(format=FORMAT, 
+                            channels=CHANNELS, 
+                            rate=RATE, input=True, 
+                            frames_per_buffer=CHUNK)
+        frames = []  # Limpa os frames
 
-        # Salva os frames em uma lista durante a gravação
-        frames = []
+        is_recording = True  # Inicia a gravação
 
-        # Grava por um tempo fixo, por exemplo, 5 segundos
-        for _ in range(0, int(RATE / CHUNK * 5)):
-            data = stream.read(CHUNK)
-            frames.append(data)
+        # Thread para capturar o áudio continuamente
+        def record_audio():
+            while is_recording:
+                data = stream.read(CHUNK)
+                frames.append(data)
 
-        # Para o stream e fecha
-        stream.stop_stream()
-        stream.close()
-        audio.terminate()
+        # Inicia a thread de gravação
+        threading.Thread(target=record_audio).start()
+
+        return JsonResponse({"message": "Recording started."})
+
+class StopRecordingView(View):
+    def post(self, request):
+        global is_recording, audio, stream
+
+        # Sinaliza o fim da gravação
+        is_recording = False
+
+        # Para e fecha o stream
+        if stream is not None:
+            stream.stop_stream()
+            stream.close()
+        if audio is not None:
+            audio.terminate()
 
         # Salva os dados gravados em um arquivo WAV
         with wave.open(OUTPUT_WAV, 'wb') as wf:
@@ -48,12 +75,7 @@ class RecordView(View):
             wf.setframerate(RATE)
             wf.writeframes(b''.join(frames))
 
-        return JsonResponse({"message": "Recording completed."})
-
-class StopRecordingView(View):
-    def post(self, request):
-        # Como não há stream na sessão, não precisamos fazer nada aqui.
-        return JsonResponse({"message": "No active recording to stop."})
+        return JsonResponse({"message": "Recording stopped and saved."})
 
 class TranscribeView(View):
     def post(self, request):
@@ -78,4 +100,3 @@ class TranscribeView(View):
 
 def index(request):
     return render(request, 'transcription/index.html')
-
