@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcrição de Áudio</title>
+    {% csrf_token %}
+</head>
+<body>
+    <h1>Transcrição de Áudio</h1>
+    <button id="start-recording">Iniciar Gravação</button>
+    <button id="stop-recording" disabled>Parar Gravação</button>
+    <button id="transcribe" disabled>Transcrever</button>
+
+    <script>
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        document.getElementById("start-recording").onclick = async () => {
+            await fetch('/transcription/start-recording/', { 
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                }
+            });
+            document.getElementById("start-recording").disabled = true;
+            document.getElementById("stop-recording").disabled = false;
+        };
+
+        document.getElementById("stop-recording").onclick = async () => {
+            await fetch('/transcription/stop-recording/', { 
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                }
+            });
+            document.getElementById("stop-recording").disabled = true;
+            document.getElementById("transcribe").disabled = false;
+        };
+
+        document.getElementById("transcribe").onclick = async () => {
+            const response = await fetch('/transcription/transcribe/', { 
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                }
+            });
+            const data = await response.json();
+            alert(data.transcription || data.error);
+        };
+    </script>
+</body>
+</html>
