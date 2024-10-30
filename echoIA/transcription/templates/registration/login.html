@@ -1,0 +1,19 @@
+<!-- templates/registration/login.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+</head>
+<body>
+    <h2>Faça login para continuar</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Entrar</button>
+    </form>
+    {% if next %}
+        <p>Você será redirecionado após o login para: {{ next }}</p>
+    {% endif %}
+</body>
+</html>
