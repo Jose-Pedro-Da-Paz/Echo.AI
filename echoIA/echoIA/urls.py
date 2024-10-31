@@ -27,5 +27,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('transcription/', include('transcription.urls')),  # Adicione esta linha
-    path('login/', auth_views.LoginView.as_view(template_name=os.path.join(BASE_DIR, 'transcription/templates/registration/login.html')), name='login')
+    path('login/', auth_views.LoginView.as_view(template_name=os.path.join(BASE_DIR, 'transcription/templates/registration/login.html')), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout')
 ]
