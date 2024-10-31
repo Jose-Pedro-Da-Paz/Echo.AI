@@ -18,6 +18,23 @@
     </div>
     <p id="upload-status" style="color: red; font-weight: bold;"></p>
 
+    <!-- Seção para exibir o histórico de transcrições -->
+    <h2>Histórico de Transcrições</h2>
+    <div id="transcription-history" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        {% if user_transcriptions %}
+            <ul>
+                {% for transcription in user_transcriptions %}
+                    <li>
+                        <strong>{{ transcription.created_at|date:"d/m/Y H:i" }}</strong>: 
+                        {{ transcription.text }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Nenhuma transcrição encontrada.</p>
+        {% endif %}
+    </div>
+
     <script>
         const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         let recordingInProgress = false;
@@ -64,7 +81,6 @@
         };
 
         document.getElementById("transcribe").onclick = async () => {
-            // Atualiza o status para indicar que o upload está em andamento
             document.getElementById("upload-status").innerText = "Enviando arquivo para transcrição, aguarde...";
 
             let uploadSuccess = false;
@@ -85,7 +101,7 @@
                         const data = await response.json();
                         document.getElementById("transcription-text").innerText = data.transcription || data.error;
                         uploadSuccess = true;
-                        document.getElementById("upload-status").innerText = ""; // Limpa a mensagem de status
+                        document.getElementById("upload-status").innerText = "";
                     } else {
                         throw new Error("Falha no upload");
                     }
@@ -93,8 +109,6 @@
                     attempts++;
                     document.getElementById("upload-status").innerText = `Tentando novamente... (${attempts}/${maxAttempts})`;
                     console.log("Erro ao transcrever:", error);
-
-                    // Espera alguns segundos antes de tentar novamente
                     await new Promise(resolve => setTimeout(resolve, 3000));
                 }
             }
