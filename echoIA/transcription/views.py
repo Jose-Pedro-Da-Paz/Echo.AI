@@ -123,7 +123,10 @@ class TranscribeView(View):
 
             except Exception as e:
                 attempt += 1
-                response_data = {"status": "Retrying upload", "attempt": attempt}
+                response_data = {
+                    "status": "Retrying upload due to network error",
+                    "attempt": attempt
+                }
                 print(f"Upload failed on attempt {attempt}. Retrying in 2 seconds...")
                 time.sleep(2)
 
@@ -131,12 +134,19 @@ class TranscribeView(View):
             response_data = {"error": "Upload failed after multiple attempts."}
 
         return JsonResponse(response_data)
-    
+
 def index(request):
+    # Consulta as transcrições do usuário
     if request.user.is_authenticated:
         user_transcriptions = Transcription.objects.filter(user=request.user).order_by('-created_at')
+        latest_transcription = user_transcriptions.first() if user_transcriptions.exists() else None
     else:
-        user_transcriptions = []  # Se o usuário não está autenticado, o histórico estará vazio
+        user_transcriptions = []
+        latest_transcription = None  # Se o usuário não está autenticado, o histórico estará vazio
     
-    return render(request, 'transcription/index.html', {'user_transcriptions': user_transcriptions})
-
+    # Renderiza a interface com o novo layout
+    return render(request, 'transcription/index.html', {
+        'user_transcriptions': user_transcriptions,
+        'latest_transcription': latest_transcription,
+        'upload_status': "Carregando..."  # Status inicial
+    })
