@@ -1,3 +1,5 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -5,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transcrição de Áudio</title>
     {% csrf_token %}
+    <link rel="stylesheet" href="{% static 'transcription/style.css' %}"> <!-- Link para o arquivo CSS -->
 </head>
 <body>
     <h1>Transcrição de Áudio</h1>
@@ -12,44 +15,29 @@
     <button id="stop-recording" disabled>Parar Gravação</button>
     <button id="transcribe" disabled>Transcrever</button>
 
-    <script>
-        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    <!-- Campo fixo para exibir a transcrição e o status de upload -->
+    <div id="transcription-result">
+        <p id="transcription-text">A transcrição aparecerá aqui...</p>
+    </div>
+    <p id="upload-status"></p>
 
-        document.getElementById("start-recording").onclick = async () => {
-            await fetch('/transcription/start-recording/', { 
-                method: 'POST', 
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                }
-            });
-            document.getElementById("start-recording").disabled = true;
-            document.getElementById("stop-recording").disabled = false;
-        };
+    <!-- Seção para exibir o histórico de transcrições -->
+    <h2>Histórico de Transcrições</h2>
+    <div id="transcription-history">
+        {% if user_transcriptions %}
+            <ul>
+                {% for transcription in user_transcriptions %}
+                    <li>
+                        <strong>{{ transcription.created_at|date:"d/m/Y H:i" }}</strong>: 
+                        {{ transcription.text }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Nenhuma transcrição encontrada.</p>
+        {% endif %}
+    </div>
 
-        document.getElementById("stop-recording").onclick = async () => {
-            await fetch('/transcription/stop-recording/', { 
-                method: 'POST', 
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                }
-            });
-            document.getElementById("stop-recording").disabled = true;
-            document.getElementById("transcribe").disabled = false;
-        };
-
-        document.getElementById("transcribe").onclick = async () => {
-            const response = await fetch('/transcription/transcribe/', { 
-                method: 'POST', 
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                }
-            });
-            const data = await response.json();
-            alert(data.transcription || data.error);
-        };
-    </script>
+    <script src="{% static 'transcription/script.js' %}"></script> <!-- Link para o arquivo JS -->
 </body>
 </html>

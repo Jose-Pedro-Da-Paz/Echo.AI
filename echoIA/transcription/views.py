@@ -7,6 +7,10 @@ from pydub import AudioSegment
 from groq import Groq
 from django.shortcuts import render
 import threading
+import time
+from .models import Transcription
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
 # Inicializa o cliente da API GROQ
 client = Groq(api_key='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')
@@ -19,7 +23,7 @@ os.makedirs(AUDIO_DIR, exist_ok=True)
 # Parâmetros de gravação
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 44000
+RATE = 16000
 CHUNK = 1024
 OUTPUT_WAV = os.path.join(AUDIO_DIR, "audio.wav")  # Salvar em WAV
 
@@ -77,26 +81,72 @@ class StopRecordingView(View):
 
         return JsonResponse({"message": "Recording stopped and saved."})
 
+@method_decorator(login_required, name='dispatch')
 class TranscribeView(View):
     def post(self, request):
-        file_path = OUTPUT_WAV  # Use o arquivo WAV para a transcrição
+        file_path = OUTPUT_WAV
 
         # Verifica se o arquivo existe
         if not os.path.exists(file_path):
             return JsonResponse({"error": "Audio file not found."}, status=404)
 
-        with open(file_path, "rb") as file:
-            transcription = client.audio.transcriptions.create(
-                file=file,
-                model="whisper-large-v3",
-                prompt="Você é um sistema de transcrição de áudio em Português. Será focado principalmente para transcrever áudios de professores de Universidade.",
-                response_format="verbose_json",
-            )
+        max_retries = 5
+        attempt = 0
+        success = False
+        response_data = {}
 
-        if hasattr(transcription, 'text'):
-            return JsonResponse({"transcription": transcription.text})
-        else:
-            return JsonResponse({"error": "Transcription not available."}, status=500)
+        while attempt < max_retries and not success:
+            try:
+                with open(file_path, "rb") as file:
+                    transcription = client.audio.transcriptions.create(
+                        file=file,
+                        model="whisper-large-v3-turbo",
+                        prompt="""Você é um sistema de transcrição de áudio em Português. 
+                        Será focado principalmente para transcrever áudios 
+                        de professores de Universidade. Esteja habituado a lidar com palavras
+                        em Português e Inglês, principalmente.
+                        Transcreva exatamente o que você escuta.""",
+                        response_format="verbose_json",
+                    )
+
+                if hasattr(transcription, 'text'):
+                    # Salvar transcrição no banco de dados
+                    Transcription.objects.create(
+                        user=request.user,
+                        text=transcription.text
+                    )
+                    response_data = {"transcription": transcription.text}
+                    success = True
+                else:
+                    response_data = {"error": "Transcription not available."}
+                    break
+
+            except Exception as e:
+                attempt += 1
+                response_data = {
+                    "status": "Retrying upload due to network error",
+                    "attempt": attempt
+                }
+                print(f"Upload failed on attempt {attempt}. Retrying in 2 seconds...")
+                time.sleep(2)
+
+        if not success:
+            response_data = {"error": "Upload failed after multiple attempts."}
+
+        return JsonResponse(response_data)
 
 def index(request):
-    return render(request, 'transcription/index.html')
+    # Consulta as transcrições do usuário
+    if request.user.is_authenticated:
+        user_transcriptions = Transcription.objects.filter(user=request.user).order_by('-created_at')
+        latest_transcription = user_transcriptions.first() if user_transcriptions.exists() else None
+    else:
+        user_transcriptions = []
+        latest_transcription = None  # Se o usuário não está autenticado, o histórico estará vazio
+    
+    # Renderiza a interface com o novo layout
+    return render(request, 'transcription/index.html', {
+        'user_transcriptions': user_transcriptions,
+        'latest_transcription': latest_transcription,
+        'upload_status': "Carregando..."  # Status inicial
+    })
