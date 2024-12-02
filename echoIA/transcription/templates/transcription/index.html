@@ -1,43 +1,49 @@
-{% load static %}
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transcrição de Áudio</title>
-    {% csrf_token %}
-    <link rel="stylesheet" href="{% static 'transcription/style.css' %}"> <!-- Link para o arquivo CSS -->
+    <title>Transcrição de Áudio com Pastas</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'transcription/style.css' %}">
+    <!-- Meta tag do CSRF token -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
-    <h1>Transcrição de Áudio</h1>
-    <button id="start-recording">Iniciar Gravação</button>
-    <button id="stop-recording" disabled>Parar Gravação</button>
-    <button id="transcribe" disabled>Transcrever</button>
-
-    <!-- Campo fixo para exibir a transcrição e o status de upload -->
-    <div id="transcription-result">
-        <p id="transcription-text">A transcrição aparecerá aqui...</p>
-    </div>
-    <p id="upload-status"></p>
-
-    <!-- Seção para exibir o histórico de transcrições -->
-    <h2>Histórico de Transcrições</h2>
-    <div id="transcription-history">
-        {% if user_transcriptions %}
-            <ul>
-                {% for transcription in user_transcriptions %}
-                    <li>
-                        <strong>{{ transcription.created_at|date:"d/m/Y H:i" }}</strong>: 
-                        {{ transcription.text }}
-                    </li>
-                {% endfor %}
+    <div class="container">
+        <aside class="sidebar">
+            <h2>Pastas</h2>
+            <ul id="folder-list">
+                <!-- Pastas serão carregadas aqui dinamicamente -->
             </ul>
-        {% else %}
-            <p>Nenhuma transcrição encontrada.</p>
-        {% endif %}
+            <form method="post" id="myForm">
+                {% csrf_token %}
+                <input type="text" id="folderNameInput" placeholder="Nome da pasta">
+                <button type="button" onclick="createFolder()">Criar Pasta</button>
+            </form>
+        </aside>
+        
+        <main class="main-content">
+            <h1>Transcrição de Áudio</h1>
+            <select id="folder-select">
+                <!-- Lista de pastas para salvar a transcrição -->
+            </select>
+            <button id="start-recording">Iniciar Gravação</button>
+            <button id="stop-recording" disabled>Parar Gravação</button>
+            <button id="transcribe" disabled>Transcrever</button>
+
+            <div id="transcription-result">
+                <!-- Campo editável para a transcrição -->
+        <div id="transcription-text" contenteditable="true" style="border: 1px solid #ccc; padding: 10px; min-height: 100px; background-color: #2a2a2a;">
+            </div>
+
+            <!-- Botão de salvar -->
+            <button id="save-transcription">Salvar Transcrição</button>
+
+            <p id="upload-status"></p>
+        </main>
     </div>
 
-    <script src="{% static 'transcription/script.js' %}"></script> <!-- Link para o arquivo JS -->
+    <script src="../static/transcription/script.js" defer></script>
 </body>
 </html>
