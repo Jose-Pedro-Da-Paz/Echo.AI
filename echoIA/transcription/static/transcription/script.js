@@ -157,37 +157,11 @@ document.getElementById("transcribe").onclick = async () => {
 // Função para carregar transcrições de uma pasta específica
 async function loadTranscriptions(folderId) {
     try {
-        document.getElementById("transcription-text").innerText = "Carregando transcrições...";
-
-        const response = await fetch(`/transcription/folders/${folderId}/transcriptions/`);
-        if (!response.ok) {
-            // Verifique se o status é 404
-            if (response.status === 404) {
-                throw new Error("A pasta não contém transcrições ou não foi encontrada.");
-            } else {
-                throw new Error("Falha ao carregar transcrições.");
-            }
-        }
-
-        const transcriptions = await response.json();
-        console.log("Transcrições carregadas:", transcriptions);
-
-        const transcriptionContainer = document.getElementById("transcription-text");
-        transcriptionContainer.innerHTML = '';
-
-        if (transcriptions.length > 0) {
-            transcriptions.forEach(transcription => {
-                const transcriptionItem = document.createElement("div");
-                transcriptionItem.classList.add("transcription-item");
-                transcriptionItem.textContent = transcription.text; // Supondo que 'text' é o campo que contém a transcrição
-                transcriptionContainer.appendChild(transcriptionItem);
-            });
-        } else {
-            transcriptionContainer.innerText = "Nenhuma transcrição encontrada.";
-        }
+        // Redireciona o usuário para a página do editor
+        window.location.href = `/transcription/editor/${folderId}/`;
     } catch (error) {
-        console.error("Erro ao carregar transcrições:", error);
-        document.getElementById("transcription-text").innerText = error.message; // Mensagem amigável
+        console.error("Erro ao redirecionar para o editor:", error);
+        alert("Não foi possível abrir o editor. Tente novamente.");
     }
 }
 
@@ -204,62 +178,39 @@ async function loadFolders() {
             const folderList = document.getElementById("folder-list");
             const folderSelect = document.getElementById("folder-select");
 
-            if (folderList && folderSelect) {
+            if (folderList) {
                 folderList.innerHTML = ''; // Limpa a lista de pastas existentes
-                folderSelect.innerHTML = ''; // Limpa as opções existentes
 
                 folders.forEach(folder => {
-                    // Adiciona pastas na barra lateral
+                    // Cria um elemento de lista com link funcional
                     const listItem = document.createElement("li");
-                    listItem.textContent = folder.name;
-                    listItem.onclick = () => loadTranscriptions(folder.id); // Chama a função para carregar as transcrições da pasta
-                    folderList.appendChild(listItem);
+                    const folderLink = document.createElement("a");
 
-                    // Adiciona pastas na lista suspensa de seleção
+                    folderLink.textContent = folder.name;
+                    folderLink.href = `/transcription/editor/${folder.id}/`; // URL para a página do editor
+                    folderLink.target = "_blank"; // Abre em uma nova guia
+                    folderLink.style.textDecoration = "none"; // Opcional
+                    folderLink.style.color = "inherit"; // Opcional
+
+                    listItem.appendChild(folderLink);
+                    folderList.appendChild(listItem);
+                });
+            } else {
+                console.error("Elemento folder-list não encontrado.");
+            }
+
+            if (folderSelect) {
+                folderSelect.innerHTML = ''; // Limpa as opções do select
+
+                folders.forEach(folder => {
                     const option = document.createElement("option");
                     option.value = folder.id;
                     option.textContent = folder.name;
+
                     folderSelect.appendChild(option);
                 });
-
-                // Adiciona botão de salvar transcrição
-                const saveButton = document.createElement("button");
-                saveButton.textContent = "Salvar Transcrição";
-                saveButton.onclick = async () => {
-                    const selectedFolderId = folderSelect.value; // Obtém a pasta selecionada
-                    const transcriptionText = document.getElementById("transcription-text").innerText;
-
-                    if (selectedFolderId && transcriptionText) {
-                        try {
-                            const saveResponse = await fetch('/transcription/save-transcription/', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRFToken': csrftoken
-                                },
-                                body: JSON.stringify({ folder_id: selectedFolderId, text: transcriptionText })
-                            });
-
-                            if (saveResponse.ok) {
-                                const data = await saveResponse.json();
-                                alert("Transcrição salva com sucesso!");
-                                console.log(data.message);
-                            } else {
-                                const errorData = await saveResponse.json();
-                                alert(`Erro ao salvar transcrição: ${errorData.error || "Desconhecido"}`);
-                            }
-                        } catch (error) {
-                            console.error("Erro ao salvar transcrição:", error);
-                            alert("Erro ao salvar transcrição. Verifique o console para mais detalhes.");
-                        }
-                    } else {
-                        alert("Selecione uma pasta e/ou garanta que há uma transcrição para salvar.");
-                    }
-                };
-
-                folderList.appendChild(saveButton);
             } else {
-                console.error("Elementos folderList ou folderSelect não encontrados.");
+                console.error("Elemento folder-select não encontrado.");
             }
         } else {
             const errorData = await response.json();
@@ -269,6 +220,8 @@ async function loadFolders() {
         console.error("Erro ao carregar as pastas:", error);
     }
 }
+
+
 
 // Função para salvar a transcrição em uma pasta selecionada
 async function saveTranscription() {
