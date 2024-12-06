@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Editor de Texto</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'transcription/editor.css' %}">
+    <script src="{% static 'transcription/editor.js' %}" defer></script>
+</head>
+<body>
+    <div class="editor-container">
+        <h1>{{ folder.name }}</h1>
+        <textarea id="infinite-editor" class="editor-textarea" placeholder="Inicie sua edição aqui..."></textarea>
+        <button id="save-button">Salvar</button>
+    </div>
+    
+</body>
+</html>
