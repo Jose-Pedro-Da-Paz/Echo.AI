@@ -1,0 +1,82 @@
+/* Estilo geral */
+body {
+    background-color: #282c34; /* Fundo escuro */
+    color: #abb2bf; /* Texto em cinza claro */
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Container do editor */
+.editor-container {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    margin: 0 auto;
+    padding: 20px;
+    height: 100%;
+}
+
+/* Área de texto */
+#infinite-editor {
+    flex-grow: 1;
+    width: 100%;
+    background-color: #1e1e1e; /* Fundo do editor */
+    color: #ffffff; /* Texto branco */
+    border: none;
+    border-radius: 8px;
+    padding: 20px;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    resize: none;
+    overflow-y: scroll;
+    height: calc(100% - 60px); /* Ajusta para ocupar a tela */
+}
+
+/* Foco no editor */
+#infinite-editor:focus {
+    outline: none;
+    border: 2px solid #007bff; /* Destaque ao focar */
+}
+
+/* Botão de salvar */
+#save-button {
+    margin-top: 10px;
+    padding: 10px 15px;
+    font-size: 1rem;
+    color: #ffffff;
+    background-color: #1a1a1a; /* Azul claro */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    align-self: flex-end;
+}
+
+#save-button:hover {
+    background-color: #007bff; /* Azul escuro ao passar o mouse */
+}
+
+/* Estilização da barra de rolagem para navegadores compatíveis */
+#infinite-editor::-webkit-scrollbar {
+    width: 8px; /* Largura da barra */
+    background-color: #1e1e1e; /* Fundo da barra (mesmo tom do editor) */
+}
+
+/* Estilo da parte visível da barra */
+#infinite-editor::-webkit-scrollbar-thumb {
+    background-color: #444; /* Cor da barra */
+    border-radius: 4px; /* Deixa as bordas arredondadas */
+}
+
+/* Efeito ao passar o mouse sobre a barra */
+#infinite-editor::-webkit-scrollbar-thumb:hover {
+    background-color: #666; /* Muda a cor ao passar o mouse */
+}
+
+/* Fundo da barra em navegadores que suportam Webkit */
+#infinite-editor::-webkit-scrollbar-track {
+    background-color: #1e1e1e; /* Fundo do track */
+}
