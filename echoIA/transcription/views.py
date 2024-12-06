@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.views import View
 from pydub import AudioSegment
 from groq import Groq
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 import threading
 import time
 from .models import Transcription, Folder
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
 
 # Inicializa o cliente da API GROQ
-client = Groq(api_key='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')
+client_groq = Groq(api_key='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')
 
 # Caminho do diretório onde os arquivos temporários serão salvos
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -135,6 +135,7 @@ class StopRecordingView(BaseAuthenticatedView):
             frames.clear()
             logger.debug("Frames de áudio resetados.")
 
+
 @method_decorator(csrf_exempt, name='dispatch')
 @method_decorator(login_required, name='dispatch')
 class TranscribeView(View):
@@ -160,7 +161,7 @@ class TranscribeView(View):
         while attempt < max_retries and not success:
             try:
                 with open(file_path, "rb") as file:
-                    transcription = client.audio.transcriptions.create(
+                    transcription = client_groq.audio.transcriptions.create(
                         file=file,
                         model="whisper-large-v3-turbo",
                         prompt="""Você é um sistema de transcrição de áudio em Português. 
@@ -172,8 +173,11 @@ class TranscribeView(View):
                     )
 
                 if hasattr(transcription, 'text'):
-                    # Retorna a transcrição ao cliente sem salvar no banco de dados
-                    response_data = {"transcription": transcription.text}
+                    # Chama o Groq para formatar a transcrição
+                    formatted_text = self.format_transcription_with_groq(transcription.text)
+
+                    # Retorna a transcrição formatada ao cliente
+                    response_data = {"transcription": formatted_text}
                     success = True
                 else:
                     response_data = {"error": "Transcription not available."}
@@ -192,6 +196,43 @@ class TranscribeView(View):
             response_data = {"error": "Upload failed after multiple attempts."}
 
         return JsonResponse(response_data)
+
+    def format_transcription_with_groq(self, transcription_text):
+        """
+        Envia a transcrição para o modelo Groq para formatação e enriquecimento.
+        """
+        prompt = (
+            "Você é um sistema inteligente especializado em processar transcrições e anotações de aulas. "
+            "Sua função principal é formatar o texto recebido de maneira clara, organizada e profissional, "
+            "tornando-o fácil de ler e adequado para estudo ou consulta futura. "
+            "Formate o seguinte texto:"
+            f"\n\n{transcription_text}\n\n"
+            "Adicione parágrafos, subtítulos e listas onde for apropriado. Se adicionar conteúdo, marque-o como '(Informação adicionada pela IA)'."
+        )
+
+        # Chamada à API do Groq para processar a transcrição
+        completion = client_groq.chat.completions.create(
+            model="llama3-groq-70b-8192-tool-use-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.5,
+            max_tokens=1024,
+            top_p=0.65,
+            stream=True,
+            stop=None,
+        )
+
+        # Agrega o resultado do modelo
+        formatted_text = ""
+        for chunk in completion:
+            formatted_text += chunk.choices[0].delta.content or ""
+
+        return formatted_text
+
     
 class SaveTranscriptionView(View):
     def post(self, request):
@@ -287,3 +328,115 @@ def transcriptions_in_folder(request, folder_id):
             return JsonResponse({"error": "Folder not found."}, status=404)
     print("Requisição inválida para transcriptions_in_folder.")
     return JsonResponse({"error": "Invalid request method."}, status=400)
+
+@login_required
+def editor_view(request, folder_id):
+    # Obtém a pasta selecionada
+    folder = get_object_or_404(Folder, id=folder_id, user=request.user)
+    # Obtém todas as transcrições associadas à pasta
+    transcriptions = Transcription.objects.filter(folder=folder).order_by('created_at')
+
+    return render(request, 'transcription/editor.html', {
+        'folder': folder,
+        'transcriptions': transcriptions
+    })
+
+@csrf_exempt
+@login_required
+def save_updates_view(request):
+    """
+    View para salvar as atualizações feitas nas transcrições.
+    Recebe uma lista de atualizações no formato JSON e as salva no banco de dados.
+    """
+    if request.method == 'POST':
+        try:
+            # Parse do corpo da requisição para JSON
+            data = json.loads(request.body)
+            updates = data.get('updates', [])
+
+            if not updates:
+                return JsonResponse({"error": "Nenhuma atualização enviada."}, status=400)
+
+            # Itera sobre as atualizações e salva cada transcrição
+            for update in updates:
+                transcription_id = update.get('id')
+                updated_text = update.get('text')
+
+                if not transcription_id or updated_text is None:
+                    return JsonResponse({"error": "ID ou texto da transcrição ausente."}, status=400)
+
+                try:
+                    # Atualiza a transcrição correspondente
+                    transcription = Transcription.objects.get(id=transcription_id, user=request.user)
+                    transcription.text = updated_text
+                    transcription.save()
+                except Transcription.DoesNotExist:
+                    return JsonResponse({"error": f"Transcrição com ID {transcription_id} não encontrada."}, status=404)
+
+            return JsonResponse({"message": "Transcrições salvas com sucesso."})
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Formato JSON inválido."}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": f"Erro inesperado: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"error": "Método não permitido."}, status=405)
+    
+from django.http import JsonResponse
+
+@login_required
+def get_concatenated_transcriptions(request, folder_id):
+    """
+    Retorna todas as transcrições da pasta concatenadas como uma única string.
+    """
+    try:
+        folder = Folder.objects.get(id=folder_id, user=request.user)
+        transcriptions = Transcription.objects.filter(folder=folder).order_by('created_at')
+        concatenated_text = "\n\n".join([t.text for t in transcriptions])  # Junta as transcrições com espaços entre elas
+        return JsonResponse({"text": concatenated_text})
+    except Folder.DoesNotExist:
+        return JsonResponse({"error": "Pasta não encontrada."}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+@login_required
+def save_concatenated_transcriptions(request):
+    """
+    Salva todas as transcrições de uma pasta como um texto único concatenado.
+    Divide o texto em transcrições individuais e atualiza o banco de dados.
+    """
+    if request.method == 'POST':
+        try:
+            # Processa o corpo da requisição
+            data = json.loads(request.body)
+            folder_id = data.get('folder_id')  # ID da pasta onde as transcrições serão salvas
+            concatenated_text = data.get('text')  # Texto completo concatenado do editor
+
+            # Valida os dados recebidos
+            if not folder_id or concatenated_text is None:
+                return JsonResponse({"error": "Folder ID e texto concatenado são obrigatórios."}, status=400)
+
+            # Obtém a pasta correspondente
+            folder = Folder.objects.get(id=folder_id, user=request.user)
+
+            # Divide o texto em transcrições individuais (separadas por duas linhas)
+            transcription_texts = concatenated_text.split("\n\n")
+
+            # Remove todas as transcrições existentes da pasta
+            Transcription.objects.filter(folder=folder).delete()
+
+            # Cria novas transcrições com base no texto concatenado
+            for text in transcription_texts:
+                Transcription.objects.create(
+                    user=request.user,
+                    folder=folder,
+                    text=text.strip()  # Remove espaços desnecessários
+                )
+
+            return JsonResponse({"message": "Transcrições salvas com sucesso."})
+        except Folder.DoesNotExist:
+            return JsonResponse({"error": "Pasta não encontrada."}, status=404)
+        except Exception as e:
+            return JsonResponse({"error": f"Erro ao salvar transcrições: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"error": "Método não permitido."}, status=405)
